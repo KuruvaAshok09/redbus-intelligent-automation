@@ -3,7 +3,7 @@
 **Repository:** https://github.com/KuruvaAshok09/redbus-intelligent-automation  
 **Author:** Kuruva Ashok (Individual B.Tech Student Project for HCLTech Autonomics Role Evaluation)  
 **Environment:** Windows 11 / Git Bash / Python 3.14.6 / Streamlit 1.67.0 / Pytest 9.2.0 / GitHub Actions  
-**Last Updated:** Phase 7 Final Documentation & Pre-Push Verification  
+**Last Updated:** Final QA stabilization review
 
 ---
 
@@ -34,21 +34,22 @@
   - [x] Report downloads and clear SIMULATED DATA indicators
 - [x] **Phase 5: DevOps and Shell Automation**
   - [x] Setup script (`scripts/setup.sh`)
-  - [x] Start application script (`scripts/start_app.sh`)
-  - [x] Test execution script (`scripts/run_tests.sh`)
+  - [x] Preferred start application script (`scripts/start.sh`)
+  - [x] Preferred test execution script (`scripts/test.sh`)
+  - [x] Compatibility wrappers retained (`scripts/start_app.sh`, `scripts/run_tests.sh`)
   - [x] Environment and application health check (`scripts/health_check.sh`)
   - [x] GitHub Actions CI workflow (`.github/workflows/tests.yml`)
 - [x] **Phase 6: Complete Testing and Quality Audit**
-  - [x] Unit & Integration test suite (`tests/test_*.py`) — **67/67 Tests Passed**
+  - [x] Unit & Integration test suite (`tests/test_*.py`) — **128 tests passed in the latest recorded run**
   - [x] Fault injection & edge cases coverage
   - [x] Offline verification (0 external API calls)
   - [x] Security audit (no credentials, no real scraping)
 - [x] **Phase 7: Final Documentation & Git Push**
-  - [x] Comprehensive `README.md` (all 26 required sections)
+  - [x] Project README with setup, architecture, demo, testing, and limitations
   - [x] Architecture design document (`docs/ARCHITECTURE.md`)
   - [x] Autonomics concepts deep-dive (`docs/AUTONOMICS_CONCEPTS.md`)
   - [x] Technical 5-minute demo guide & 15 interview Q&A (`docs/DEMO_GUIDE.md`)
-  - [x] Git commit and push verification
+  - [ ] Git commit and push (not performed)
 
 ---
 
@@ -56,9 +57,10 @@
 - `.gitignore` (Configured exclusions for venv, pycache, logs, reports, IDE files)
 - `requirements.txt` (Minimal dependencies: streamlit, pytest)
 - `PROJECT_STATUS.md` (Progress tracking)
-- `README.md` (Master documentation with all 26 required sections)
+- `README.md` (Project overview, setup, workflow, demo, testing, and limitations)
 - `app.py` (Enterprise Streamlit Web Dashboard)
-- `data/sample_buses.json` (21 verified offline simulated bus schedules across key corridors)
+- `data/sample_buses.json` (30 offline simulated bus schedules across key corridors)
+- `data/fallback_buses.json` (matching simulated secondary inventory for all primary catalog routes)
 - `logs/.gitkeep` (Log directory anchor)
 - `reports/.gitkeep` (Report directory anchor)
 - `redbus_automation/__init__.py` (Package exports)
@@ -76,8 +78,9 @@
 - `redbus_automation/orchestrator.py` (Master workflow orchestrator)
 - `redbus_automation/main.py` (CLI interface)
 - `scripts/setup.sh` (POSIX and Git Bash setup script)
-- `scripts/start_app.sh` (Streamlit start script)
-- `scripts/run_tests.sh` (Pytest test runner script)
+- `scripts/start.sh` (preferred Streamlit start script)
+- `scripts/test.sh` (preferred Pytest runner)
+- `scripts/start_app.sh` and `scripts/run_tests.sh` (compatibility wrappers retained)
 - `scripts/health_check.sh` (System health and directory auditor)
 - `.github/workflows/tests.yml` (CI/CD GitHub Actions multi-version workflow)
 - `docs/ARCHITECTURE.md` (Detailed system architecture document)
@@ -85,37 +88,39 @@
 - `docs/DEMO_GUIDE.md` (5-minute demonstration script & 15 interview Q&As)
 - `tests/__init__.py` (Test package marker)
 - `tests/test_validator.py` (Validation unit tests - 26 tests)
-- `tests/test_search.py` (Search & fault injection unit tests - 9 tests)
+- `tests/test_search.py` (Search & fault injection unit tests - 11 collected cases)
 - `tests/test_comparison.py` (MCDA ranking & filter unit tests - 9 tests)
 - `tests/test_retry.py` (Retry engine unit tests - 5 tests)
 - `tests/test_recovery.py` (Recovery engine unit tests - 3 tests)
 - `tests/test_reporting.py` (Reporting unit tests - 3 tests)
 - `tests/test_monitoring.py` (Monitoring unit tests - 6 tests)
-- `tests/test_orchestrator.py` (End-to-end integration tests - 6 tests)
+- `tests/test_orchestrator.py` (End-to-end integration tests - 8 tests)
 
 ---
 
 ## 3. Commands Executed and Actual Results
+Items 1–9 below are historical checks; items 10–12 record the latest post-fix test and browser verification.
 1. `Get-ChildItem -Force` -> Inspected initial workspace.
-2. `git init` -> Initialized local Git repository with user `KuruvaAshok09` (`vtu24734@veltech.edu.in`).
+2. `git init` -> Initialized the local Git repository.
 3. `git remote add origin https://github.com/KuruvaAshok09/redbus-intelligent-automation.git` -> Configured remote origin.
 4. `python -m pip install streamlit` -> Successfully installed Streamlit 1.67.0 and dependencies.
 5. `python -m py_compile app.py` -> Clean compilation with 0 syntax or import errors.
 6. `python -m redbus_automation.main` -> CLI executed in 0.033s; ranked 9 buses, generated JSON/CSV reports.
 7. `python -m redbus_automation.main --simulate-transient-failure` -> Tested fault injection; bounded retries & self-healing secondary mirror fallback succeeded (status: RECOVERED).
 8. `& "C:\Program Files\Git\bin\bash.exe" scripts/health_check.sh` -> 13/13 health checks passed (Status: HEALTHY).
-9. `& "C:\Program Files\Git\bin\bash.exe" scripts/run_tests.sh` -> 67/67 tests passed in 0.96 seconds.
-10. `python -m pytest tests/ -v` -> 67 passed, 1 warning (deprecation from anyio), 0 failures.
+9. `& "C:\Program Files\Git\bin\bash.exe" --noprofile --norc -lc './scripts/test.sh'` -> 74/74 tests passed in 12.68 seconds.
+10. `.\.venv\Scripts\python.exe -m pytest -q` -> 128 passed in 13.73 seconds, no warnings, exit code 0.
+11. Fresh Streamlit process on port 8503 -> health endpoint returned HTTP 200 and the dashboard loaded in the browser. Ahmedabad ↔ Mumbai and Kochi ↔ Coimbatore returned simulated bus results in both directions; Kochi → Coimbatore booking produced simulated PNR `SIM-PNR-EB83CA`.
+12. Browser regressions -> Bangalore → Jaipur showed the explicit no-simulated-buses message. Scenario 2 displayed exactly three retry events in Workflow and Incident Center; the incident history showed `RESOLVED` and `SECONDARY_MIRROR_FALLBACK`.
+13. Route expansion regression suite -> 10 inter-state city pairs covered in both directions; normal search/filter/booking/PNR and Scenario 2 secondary-mirror recovery passed for all 20 directions.
 
 ---
 
 ## 4. Known Defects and Unresolved Issues
-- None. All 67 tests pass cleanly, 0 defects identified.
+- The project is an offline simulation; no live RedBus API, booking, or payment integration is present.
+- Browser checks were targeted rather than exhaustive; see `FINAL_QA_AUDIT.md` for exact coverage and evidence.
 
 ---
 
 ## 5. Next Implementation Step
-- Stage all project files with git.
-- Review git status.
-- Commit with meaningful message.
-- Push to GitHub repository (`origin/main`).
+- Review the working tree before any future staging, commit, or push.

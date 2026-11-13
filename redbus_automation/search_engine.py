@@ -178,3 +178,25 @@ class BusSearchEngine:
             return [{"source": s, "destination": d} for s, d in sorted(routes)]
         except Exception:
             return []
+
+    def get_all_cities(self) -> List[str]:
+        """Returns city names present in both primary and fallback catalogs."""
+        cities = set()
+        for catalog_file in (self.data_file, CONFIG.DEFAULT_FALLBACK_DATA_FILE):
+            if not catalog_file.exists():
+                raise DataFetchError(f"Simulated bus catalog not found at: {catalog_file}")
+            try:
+                with open(catalog_file, "r", encoding="utf-8") as catalog:
+                    records = json.load(catalog)
+                for record in records:
+                    cities.update(
+                        city.strip()
+                        for city in (str(record["source"]), str(record["destination"]))
+                        if city.strip()
+                    )
+            except (OSError, json.JSONDecodeError, KeyError, TypeError) as error:
+                raise DataFetchError(
+                    f"Failed to read simulated bus catalog {catalog_file}: {error}"
+                ) from error
+
+        return sorted(cities)

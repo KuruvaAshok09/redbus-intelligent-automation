@@ -66,9 +66,9 @@ python -c "import streamlit, pytest; print(f'[✓] Streamlit {streamlit.__versio
 echo "=================================================================="
 echo " Setup Completed Successfully!"
 echo " Next steps:"
-echo "   - Run tests     : bash scripts/run_tests.sh"
+echo "   - Run tests     : bash scripts/test.sh"
 echo "   - Health check  : bash scripts/health_check.sh"
-echo "   - Start web app : bash scripts/start_app.sh"
+echo "   - Start web app : bash scripts/start.sh"
 echo "   - Run CLI tool  : python -m redbus_automation.main"
 echo "=================================================================="
 exit 0

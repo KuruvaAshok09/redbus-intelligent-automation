@@ -32,6 +32,18 @@ venv/
 ENV/
 env/
 
+# Environment variables and credentials
+.env
+.env.*
+!.env.example
+credentials/
+secrets/
+*.pem
+*.p12
+*.pfx
+*.key
+service-account*.json
+
 # Testing and Coverage
 .pytest_cache/
 .coverage
@@ -56,11 +68,15 @@ $RECYCLE.BIN/
 *.swp
 *.swo
 
-# Project logs and report outputs (preserve folder structure with .gitkeep)
+# Project logs, reports, and backups
 logs/*.log
 logs/*.jsonl
 logs/*.json
 reports/*.csv
 reports/*.json
+reports/*.jsonl
+backups/*
+!backups/.gitkeep
 !logs/.gitkeep
 !reports/.gitkeep
+backups/

@@ -14,11 +14,11 @@ This step-by-step sequence is designed to showcase the complete engineering arch
 - **Objective:** Prove environmental readiness and clean dependency status.
 - **Action:** Open terminal (Git Bash or PowerShell) and run:
   ```bash
-  python -m pytest tests/ -v
+  bash scripts/test.sh
   ```
 - **What to Demonstrate:**
-  - 67 tests passing in ~1.0 second.
-  - Explain that all unit, integration, validation, retry, recovery, and reporting components are verified with 100% test pass rate.
+  - The latest recorded test run: 126 passed, no warnings.
+  - Explain that all current unit, integration, validation, retry, recovery, and reporting tests pass.
   - Highlight the offline nature: zero external network calls are made.
 
 ---
@@ -32,7 +32,7 @@ This step-by-step sequence is designed to showcase the complete engineering arch
 - **What to Highlight in Output:**
   - `Execution ID`: Traceable unique run identifier (e.g., `EXEC-20261113-194947-5A04EC`).
   - `Status`: `SUCCESS` with execution duration (~0.03 seconds).
-  - `Decision Explainability`: Show the natural language reason for the Top Recommended bus (e.g., GreenLine Travels or IntrCity SmartBus).
+  - `Decision Explainability`: Show the natural language reason for the top-ranked simulated demo bus.
   - `Generated Artifacts`: Point out the generated JSON and CSV reports in `reports/`.
 
 ---
@@ -55,13 +55,13 @@ This step-by-step sequence is designed to showcase the complete engineering arch
 - **Objective:** Demonstrate user-facing observability, real-time KPI tiles, and report downloads.
 - **Action:** Start the dashboard:
   ```bash
-  python -m streamlit run app.py
+  bash scripts/start.sh
   ```
 - **What to Walk Through:**
   1. **Top Notice:** Point out the clear `[SIMULATED DATA]` indicator.
   2. **Sidebar:** Enter route (Bangalore -> Hyderabad), pick journey date, click **"Search & Execute Automation"**.
   3. **Overview Tab:** Show the Recommended Bus card, composite score, and explainability text.
-  4. **Monitoring Tab:** Show the live KPI telemetry: Total Executions, Success Rate %, Latency, Retries.
+  4. **Executive Dashboard:** Show runtime KPI telemetry: Total Executions, Success Rate %, Latency, and recovery counts. These in-process dashboard metrics are not shared with the standalone health probe.
   5. **Incident Tab:** Show retry telemetry and self-healing action history.
   6. **Execution Logs Tab:** Show live structured JSON audit lines.
   7. **Reports Tab:** Click **"Download CSV"** and **"Download JSON"** to inspect compliance reports.
@@ -102,7 +102,7 @@ These answers directly reflect the actual codebase and engineering decisions imp
 > *"Python was chosen for its rich standard library, clean dataclasses and type hinting, modular design capabilities, and rapid testing ecosystem (Pytest). It allows strict separation of concerns between headless business logic and user presentation layers (CLI and Streamlit), making it ideal for enterprise-grade automation."*
 
 ### 10. Why use Bash?
-> *"Bash scripts provide portable, automated environment bootstrapping, continuous testing, and health checks across Windows 11 Git Bash and Linux environments. Scripts like `setup.sh`, `run_tests.sh`, and `health_check.sh` enforce deterministic CI/CD and deployment standards without manual manual commands."*
+> *"Bash scripts provide portable, automated environment bootstrapping, continuous testing, and health checks across Windows 11 Git Bash and Linux environments. Scripts like `setup.sh`, `test.sh`, and `health_check.sh` enforce deterministic CI/CD and deployment standards without manual commands. Compatibility wrappers such as `run_tests.sh` remain available for convenience."*
 
 ### 11. How does the system work offline?
 > *"The platform is completely offline-first. Simulated bus inventory is stored in a structured local JSON file (`data/sample_buses.json`). All filtering, scoring, retries, self-healing, logging, and reporting run entirely on local CPU cycles without making external HTTP requests or relying on external cloud APIs."*
