@@ -21,14 +21,22 @@ elif [ -f ".venv/bin/activate" ]; then
     echo "[✓] Virtual environment activated (POSIX)."
 fi
 
-# 2. Verify Python Availability
-if ! command -v python >/dev/null 2>&1; then
+# 2. Resolve the Python executable explicitly to avoid Windows App Execution Alias issues
+if [ -f ".venv/Scripts/python.exe" ]; then
+    PYTHON_BIN=".venv/Scripts/python.exe"
+elif [ -f ".venv/bin/python" ]; then
+    PYTHON_BIN=".venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="python3"
+elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN="python"
+else
     echo "ERROR: Python is not available in the current environment." >&2
     exit 1
 fi
 
 # 3. Verify Streamlit and Core Package Imports
-if ! python -c "import streamlit, redbus_automation" >/dev/null 2>&1; then
+if ! "$PYTHON_BIN" -c "import streamlit, redbus_automation" >/dev/null 2>&1; then
     echo "ERROR: Required packages (streamlit, redbus_automation) cannot be imported." >&2
     echo "Please run 'bash scripts/setup.sh' first to configure dependencies." >&2
     exit 1
@@ -41,4 +49,4 @@ echo "[*] Access the dashboard at: http://localhost:$PORT"
 echo "[*] Press Ctrl+C to terminate the dashboard."
 echo "------------------------------------------------------------------"
 
-exec python -m streamlit run app.py --server.port "$PORT" --server.headless true
+exec "$PYTHON_BIN" -m streamlit run app.py --server.port "$PORT" --server.headless true

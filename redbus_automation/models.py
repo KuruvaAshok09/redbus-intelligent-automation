@@ -1,6 +1,7 @@
 """
 Data models, enumerations, and custom exception definitions for the RedBus Automation platform.
-Adheres to strict dataclass usage, typing contracts, and domain-driven design.
+Adheres to strict dataclass usage, typing contracts, domain-driven design,
+and comprehensive incident management for autonomic systems.
 """
 
 from dataclasses import dataclass, field
@@ -41,8 +42,21 @@ class AutomationEventType(str, Enum):
     RECOVERY_INITIATED = "RECOVERY_INITIATED"
     RECOVERY_COMPLETED = "RECOVERY_COMPLETED"
     REPORT_GENERATED = "REPORT_GENERATED"
+    BOOKING_SIMULATED = "BOOKING_SIMULATED"
+    INCIDENT_RECORDED = "INCIDENT_RECORDED"
     WORKFLOW_COMPLETED = "WORKFLOW_COMPLETED"
     WORKFLOW_TERMINATED = "WORKFLOW_TERMINATED"
+
+
+class FailureCategory(str, Enum):
+    """Classification of operational failures for autonomic decision-making."""
+    VALIDATION_ERROR = "VALIDATION_ERROR"              # Permanent / Non-recoverable
+    TRANSIENT_SERVICE_ERROR = "TRANSIENT_SERVICE_ERROR" # Recoverable via retry / fallback
+    CATALOG_FETCH_ERROR = "CATALOG_FETCH_ERROR"         # Recoverable via seed reconstitution
+    TIMEOUT_ERROR = "TIMEOUT_ERROR"                     # Recoverable via retry / fallback
+    FILTER_ZERO_RESULTS = "FILTER_ZERO_RESULTS"         # Recoverable via constraint relaxation
+    REPORT_GENERATION_ERROR = "REPORT_GENERATION_ERROR" # Recoverable / Non-fatal fallback
+    UNRECOVERABLE_ERROR = "UNRECOVERABLE_ERROR"         # Non-recoverable escalation
 
 
 # ---------------------------------------------------------
@@ -164,6 +178,64 @@ class RecoveryAction:
 
 
 @dataclass
+class Incident:
+    """Structured incident record for enterprise incident management."""
+    incident_id: str
+    timestamp: str
+    failure_category: FailureCategory
+    is_recoverable: bool
+    error_message: str
+    retry_attempts: int = 0
+    recovery_action: Optional[str] = None
+    final_status: str = "OPEN"  # OPEN, RESOLVED, RECOVERED, UNRESOLVED, FAILED
+    execution_id: Optional[str] = None
+    details: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class Seat:
+    """Simulated seat specification for booking workflow."""
+    seat_number: str
+    deck: str = "Lower"  # Lower or Upper
+    berth_type: str = "Window"  # Window, Aisle
+    is_available: bool = True
+    fare: float = 0.0
+
+
+@dataclass
+class BookingRequest:
+    """Simulated passenger ticket booking reservation request."""
+    booking_id: str
+    execution_id: str
+    bus_id: str
+    operator_name: str
+    source: str
+    destination: str
+    journey_date: str
+    passenger_name: str
+    passenger_email: str
+    passenger_phone: str
+    selected_seats: List[str]
+    total_fare: float
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+
+
+@dataclass
+class BookingConfirmation:
+    """Simulated booking confirmation artifact."""
+    confirmation_reference: str
+    pnr_number: str
+    status: str = "CONFIRMED (SIMULATED)"
+    booking_request: Optional[BookingRequest] = None
+    bus: Optional[Bus] = None
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    disclaimer: str = (
+        "DEMO / SIMULATION MODE: No real ticket is booked, no payment is processed, "
+        "and no personal data is transmitted to live booking providers."
+    )
+
+
+@dataclass
 class WorkflowExecutionResult:
     """Complete summary of an orchestrated automation run."""
     execution_id: str
@@ -174,8 +246,10 @@ class WorkflowExecutionResult:
     recommended_bus: Optional[RankedBus] = None
     retry_history: List[RetryAttempt] = field(default_factory=list)
     recovery_history: List[RecoveryAction] = field(default_factory=list)
+    incidents: List[Incident] = field(default_factory=list)
     execution_duration_sec: float = 0.0
     start_time: str = ""
     end_time: str = ""
     error_message: Optional[str] = None
+    stage_reached: str = "COMPLETED"
     report_paths: Dict[str, str] = field(default_factory=dict)

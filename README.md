@@ -1,491 +1,202 @@
-# RedBus Intelligent Ticket Search and Automation System
-### An Enterprise Offline-First Autonomics and Workflow Automation Platform
+# RedBus Intelligent Automation
 
-[![CI/CD Pipeline](https://github.com/KuruvaAshok09/redbus-intelligent-automation/actions/workflows/tests.yml/badge.svg)](https://github.com/KuruvaAshok09/redbus-intelligent-automation/actions)
-![Python Version](https://img.shields.io/badge/Python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.14-blue)
-![Pytest Status](https://img.shields.io/badge/Tests-67%20Passed%20(100%25)-brightgreen)
-![License](https://img.shields.io/badge/License-MIT-green)
-![Status](https://img.shields.io/badge/Mode-Offline--First%20Simulated-orange)
+An offline-first demonstration of autonomic workflow orchestration for bus search and simulated booking.
 
-> **⚠️ ACADEMIC & COMPLIANCE NOTICE (SIMULATED DATA):**  
-> This project is an individual B.Tech student project developed strictly for **HCLTech Autonomics Role Evaluation**. All bus schedules, pricing, operators, and seat inventories are simulated offline models (`data/sample_buses.json`). It does **not** scrape RedBus, does **not** interact with live booking infrastructure, collects **no** personal passenger data, processes **no** payments, and bypasses **no** anti-bot challenges. The entire application operates 100% offline.
+![Test result](https://img.shields.io/badge/Tests-128%20passed-brightgreen)
+![Mode](https://img.shields.io/badge/Mode-Offline%20simulation-orange)
 
----
+> **Simulation notice:** Bus schedules, fares, availability, fault injection, bookings, and PNR references are simulated. This project does not connect to a live RedBus API, scrape RedBus, reserve real seats, or process payments.
 
-## Table of Contents
-1. [Project Title](#1-project-title)
-2. [Project Overview](#2-project-overview)
-3. [Problem Statement](#3-problem-statement)
-4. [Project Objectives](#4-project-objectives)
-5. [Technology Stack](#5-technology-stack)
-6. [System Architecture](#6-system-architecture)
-7. [Module Descriptions](#7-module-descriptions)
-8. [Automation Workflow](#8-automation-workflow)
-9. [Monitoring Architecture](#9-monitoring-architecture)
-10. [Incident Detection](#10-incident-detection)
-11. [Retry Mechanism (Exponential Backoff)](#11-retry-mechanism-exponential-backoff)
-12. [Recovery Mechanism (Self-Healing)](#12-recovery-mechanism-self-healing)
-13. [Structured JSON Logging](#13-structured-json-logging)
-14. [Operational Reporting](#14-operational-reporting)
-15. [Bash Scripting & DevOps](#15-bash-scripting--devops)
-16. [Installation Instructions for Windows 11](#16-installation-instructions-for-windows-11)
-17. [Git Bash Setup Instructions](#17-git-bash-setup-instructions)
-18. [Dashboard Execution (Streamlit)](#18-dashboard-execution-streamlit)
-19. [CLI Execution](#19-cli-execution)
-20. [Test Execution (Pytest)](#20-test-execution-pytest)
-21. [Sample Input and Output](#21-sample-input-and-output)
-22. [Sample JSON Log](#22-sample-json-log)
-23. [Sample CSV Report](#23-sample-csv-report)
-24. [Project Limitations](#24-project-limitations)
-25. [Future Enhancements](#25-future-enhancements)
-26. [Individual Student Contribution Section](#26-individual-student-contribution-section)
+## Project overview and objective
 
----
+The project demonstrates how an automation workflow can search a local bus catalog, rank available options, simulate a booking, and respond to failures without requiring a live travel service. Its objective is to make the workflow observable and resilient: validate requests, detect operational failures, retry transient errors, attempt a fallback, and record execution and incident details.
 
-## 1. Project Title
-**RedBus Intelligent Ticket Search and Automation System**  
-*Enterprise Offline-First Workflow Automation, Incident Self-Healing, and Observability Platform.*
+It includes a Streamlit dashboard, a Python workflow engine, a command-line search entry point, simulated booking, operational telemetry, and CSV/JSON reports.
 
----
+## Why this is an Autonomics project
 
-## 2. Project Overview
-The platform demonstrates modern enterprise **Autonomics Engineering** applied to travel search automation. It replaces fragile manual booking searches with a resilient, observable, multi-step pipeline featuring:
-- Automated input sanitization and domain rule validation.
-- Bounded retries with exponential backoff for transient failures.
-- Automated self-healing recovery routines (secondary mirror routing, catalog seed reconstitution, constraint relaxation).
-- Deterministic Multi-Criteria Decision Analysis (MCDA) ranking with explainable natural language recommendations.
-- Unified structured JSON telemetry and immutable compliance reporting (CSV & JSON).
-- Enterprise presentation via both CLI and an interactive Streamlit dashboard.
+Rather than stopping at a failed search, the workflow observes its execution, classifies failures, and takes bounded recovery actions. In practice, the project demonstrates an autonomic feedback loop:
 
----
+1. **Monitor:** Collect execution metrics, retry and recovery history, and structured events.
+2. **Analyze:** Validate requests and detect simulated transient failures or other unsuccessful outcomes.
+3. **Plan and act:** Retry transient errors within configured limits and attempt recovery when needed.
+4. **Record:** Log workflow and incident outcomes for dashboard review and reports.
 
-## 3. Problem Statement
-Traditional travel booking search scripts suffer from severe enterprise operational deficiencies:
-1. **Fragility & Crash Prone:** Upstream network timeouts or transient API blips crash unhardened scripts.
-2. **Infinite Retry Traps:** Poorly designed scripts either loop forever on permanent validation errors or fail without retrying temporary blips.
-3. **Black-Box Lack of Observability:** Unstructured console `print()` statements prevent enterprise monitoring tools from tracking latencies, failure rates, and health metrics.
-4. **Arbitrary Recommendations:** Ranking algorithms rarely explain *why* a particular option was chosen over alternatives.
-5. **Lack of Self-Healing:** Any unexpected scenario (such as zero results due to strict budget constraints) halts execution instead of applying intelligent autonomic remedies.
+This is a local simulation of autonomic behavior, not a production connection to external booking infrastructure.
 
----
+## Architecture and folder structure
 
-## 4. Project Objectives
-- Build an offline-first, enterprise-grade Python automation platform without external cloud API dependencies.
-- Implement autonomic self-healing (MAPE-K pattern) with bounded retries and automated recovery.
-- Establish end-to-end traceability with unique execution IDs and structured JSON logging.
-- Provide explainable decision-making in bus ticket recommendations.
-- Enable automated continuous integration (CI/CD) and operational shell scripts compatible with Windows 11 Git Bash and Linux.
-
----
-
-## 5. Technology Stack
-- **Language:** Python 3.9+ (Tested on Python 3.10, 3.11, 3.12, 3.14)
-- **UI Framework:** Streamlit (v1.30+)
-- **Testing Framework:** Pytest (v8.0+)
-- **Data Serialization:** Python Standard Library (`json`, `csv`, `dataclasses`, `pathlib`)
-- **DevOps & Scripting:** Git Bash, POSIX Shell Scripting, GitHub Actions CI
-- **Version Control:** Git, GitHub (`origin/main`)
-
----
-
-## 6. System Architecture
-```
+```text
 redbus-intelligent-automation/
-│
-├── redbus_automation/          # Decoupled Core Business & Autonomics Engines
-│   ├── __init__.py             # Package exports
-│   ├── main.py                 # CLI interface
-│   ├── config.py               # Central configuration & paths
-│   ├── models.py               # Strongly typed dataclasses & exceptions
-│   ├── validator.py            # Input validation & sanitization
-│   ├── search_engine.py        # Local catalog search & fault injection
-│   ├── filter_engine.py        # Domain constraints & filters
-│   ├── comparison_engine.py    # MCDA ranking & explainability
-│   ├── orchestrator.py         # Central lifecycle orchestrator
-│   ├── retry_engine.py         # Bounded retries & exponential backoff
-│   ├── recovery_engine.py      # Autonomic self-healing remediations
-│   ├── monitoring.py           # Real-time metrics & observability
-│   ├── logger.py               # Structured JSON logging contract
-│   └── reporting.py            # CSV & JSON audit report generation
-│
+├── app.py                       # Streamlit dashboard and simulated booking UI
+├── redbus_automation/
+│   ├── main.py                  # Search CLI
+│   ├── orchestrator.py          # Workflow lifecycle and coordination
+│   ├── validator.py             # Search request validation
+│   ├── search_engine.py         # Local catalog search and fault injection
+│   ├── filter_engine.py         # Search result filtering
+│   ├── comparison_engine.py     # Result ranking
+│   ├── retry_engine.py          # Bounded retries for transient errors
+│   ├── recovery_engine.py       # Fallback and recovery actions
+│   ├── booking_engine.py        # Simulated seat booking and PNR references
+│   ├── incident_manager.py     # Incident tracking and summaries
+│   ├── monitoring.py            # Runtime metrics
+│   ├── logger.py                # Structured event logging
+│   ├── reporting.py             # CSV and JSON report generation
+│   ├── config.py                # Paths and application configuration
+│   └── models.py                # Workflow and domain models
 ├── data/
-│   └── sample_buses.json       # 21 verified offline simulated bus schedules
-│
-├── logs/                       # Structured JSONL execution logs
-│   ├── .gitkeep
-│   └── automation_execution.jsonl
-│
-├── reports/                    # Auditable execution reports
-│   ├── .gitkeep
-│   ├── report_*.csv
-│   └── report_*.json
-│
-├── tests/                      # Pytest automated test suite (67 tests)
-│   ├── __init__.py
-│   ├── test_validator.py       # Validation boundary tests
-│   ├── test_search.py          # Search & fault injection tests
-│   ├── test_comparison.py      # MCDA ranking & filtering tests
-│   ├── test_retry.py           # Bounded retry & backoff tests
-│   ├── test_recovery.py        # Self-healing recovery tests
-│   ├── test_reporting.py       # CSV & JSON report integrity tests
-│   ├── test_orchestrator.py    # End-to-end integration tests
-│   └── test_monitoring.py      # Telemetry & KPI metric tests
-│
-├── scripts/                    # Shell automation (Windows Git Bash & Linux)
-│   ├── setup.sh                # Environment bootstrapping & venv
-│   ├── start_app.sh            # Streamlit dashboard launcher
-│   ├── run_tests.sh            # Automated test runner
-│   └── health_check.sh         # System health & directory auditor
-│
-├── docs/                       # Comprehensive documentation
-│   ├── ARCHITECTURE.md         # Detailed architectural design
-│   ├── AUTONOMICS_CONCEPTS.md  # Deep dive into enterprise autonomics
-│   └── DEMO_GUIDE.md           # 5-minute demo sequence & 15 interview Q&A
-│
-├── .github/
-│   └── workflows/
-│       └── tests.yml           # Multi-Python GitHub Actions workflow
-│
-├── app.py                      # Enterprise Streamlit Web Dashboard
-├── requirements.txt            # Minimal dependency definitions
-├── .gitignore                  # Git exclusions
-├── README.md                   # Master project documentation
-└── PROJECT_STATUS.md           # Milestone & audit tracking record
+│   ├── sample_buses.json        # Primary simulated catalog
+│   └── fallback_buses.json      # Offline fallback catalog
+├── scripts/                     # Setup, startup, test, and health scripts
+├── tests/                       # Pytest coverage for core modules and workflows
+├── docs/                        # Architecture, autonomics, and demo documentation
+├── logs/                        # Runtime structured logs
+├── reports/                     # Generated CSV and JSON reports
+├── requirements.txt
+└── FINAL_QA_AUDIT.md            # Final verified QA results
 ```
 
----
+### Main workflow
 
-## 7. Module Descriptions
-- **`validator.py`:** Enforces strict boundary rules. Validates source/destination city format, date validity (rejecting past dates), passenger range [1..10], and positive budgets. Raises permanent `ValidationError` that is never retried.
-- **`search_engine.py`:** Reads simulated bus schedules offline from `data/sample_buses.json`. Houses deterministic fault injection hooks for testing resilience.
-- **`filter_engine.py`:** Prunes raw buses by budget, passenger seat availability, preferred operators, minimum ratings, and departure time windows.
-- **`comparison_engine.py`:** Normalized multi-criteria scoring balancing Fare (40%), Duration (25%), Rating (25%), and Seat Availability (10%). Generates natural-language explainability text.
-- **`retry_engine.py`:** Bounded retries with exponential backoff. Retries transient exceptions; rejects permanent validation errors immediately.
-- **`recovery_engine.py`:** Self-healing recovery strategies: secondary mirror routing, catalog seed reconstitution, and filter relaxation.
-- **`orchestrator.py`:** Central master pipeline coordinator driving step-by-step lifecycle execution and unique execution IDs (`EXEC-...`).
-- **`monitoring.py`:** Singleton metrics aggregator tracking total runs, success rate, failure rate, latencies, and active status without double counting.
-- **`logger.py`:** Thread-safe structured JSON logger appending to `logs/automation_execution.jsonl`.
-- **`reporting.py`:** Generates compliance artifacts in structured CSV and JSON formats in `reports/`.
-
----
-
-## 8. Automation Workflow
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as User / CLI / Web UI
-    participant Orch as Central Orchestrator
-    participant Val as InputValidator
-    participant Retry as RetryEngine
-    participant Srch as BusSearchEngine
-    participant Rec as RecoveryEngine
-    participant Filt as BusFilterEngine
-    participant Rank as BusComparisonEngine
-    participant Rep as ReportGenerator
-    participant Mon as AutomationMonitor
-    participant Log as Structured Logger
-
-    User->>Orch: Submit SearchRequest(source, dest, date, pax, budget)
-    Orch->>Log: WORKFLOW_STARTED (Assign Execution ID)
-    Orch->>Mon: record_start(execution_id)
-    Orch->>Val: validate(request)
-    alt Invalid Input
-        Val-->>Orch: raise ValidationError
-        Orch->>Log: VALIDATION_FAILED
-        Orch->>Mon: record_completion(FAILED)
-        Orch-->>User: Return FAILED Result (0 Retries)
-    else Valid Input
-        Val-->>Orch: Sanitized SearchRequest
-    end
-
-    Orch->>Retry: execute_with_retry(search_op)
-    alt Transient Service Disruption
-        Retry->>Srch: Primary Search Attempt
-        Srch-->>Retry: TransientServiceError
-        Retry->>Retry: Exponential Backoff Delay
-        Note over Retry: Max Retries Exhausted
-        Retry-->>Orch: raise TransientServiceError
-        Orch->>Rec: handle_search_failure(exc)
-        Rec->>Srch: Query Secondary Offline Mirror
-        Srch-->>Rec: Fallback Buses Found
-        Rec-->>Orch: (Recovered Buses, RecoveryAction SUCCESS)
-    else Normal Search
-        Retry->>Srch: Primary Search Attempt
-        Srch-->>Retry: Buses Found
-        Retry-->>Orch: Buses Found (0 Retries)
-    end
-
-    Orch->>Filt: apply_filters(buses, request)
-    alt Zero Buses Match Filters
-        Filt-->>Orch: 0 Filtered Buses
-        Orch->>Rec: remediate_zero_results(request, buses)
-        Rec-->>Orch: (Relaxed Budget +25%, Operator Removed)
-        Orch->>Filt: apply_filters(buses, relaxed_request)
-    end
-    Filt-->>Orch: Filtered Candidate Buses
-
-    Orch->>Rank: rank_buses(filtered_buses)
-    Rank-->>Orch: Ranked Buses with Explainable Reasons
-    Orch->>Rep: generate_all_reports(result)
-    Rep-->>Orch: (JSON Path, CSV Path)
-    Orch->>Mon: record_completion(SUCCESS / RECOVERED)
-    Orch->>Log: WORKFLOW_COMPLETED
-    Orch-->>User: Final WorkflowExecutionResult
+```text
+Dashboard or CLI request
+  -> validation
+  -> local catalog search
+  -> bounded retry for transient failures
+  -> recovery, if needed
+  -> filtering and ranking
+  -> simulated booking (dashboard)
+  -> metrics, incident/event logs, and reports
 ```
 
----
+The Streamlit dashboard has tabs for the Executive Dashboard, Automation Workflow, Bus Search & Booking Simulation, Incident Center, and Reports & Audit Center. Dashboard metrics are obtained from the runtime monitoring and incident components.
 
-## 9. Monitoring Architecture
-The system tracks runtime health metrics through `AutomationMonitor`:
-- **Total Executions:** Cumulative workflow attempts.
-- **Successful Executions:** Runs completing all steps cleanly.
-- **Recovered Executions:** Runs completing successfully via self-healing actions.
-- **Failed Executions:** Runs halted by validation errors or unrecoverable incidents.
-- **Success Rate ($\%$):** $\frac{\text{Success} + \text{Recovered}}{\text{Total}} \times 100$
-- **Failure Rate ($\%$):** $\frac{\text{Failed}}{\text{Total}} \times 100$
-- **Average Duration (seconds):** Rolling arithmetic mean latency.
-- **Double Counting Safeguard:** Deduped via internal execution ID registry.
+## Failure detection, retry, recovery, and incident logging
 
----
+- The orchestrator validates a search request before processing it. Invalid requests are treated as non-retryable failures.
+- The retry engine retries transient search failures with a bounded backoff policy; it does not retry every error indiscriminately.
+- When primary search attempts fail, the recovery engine can use `SECONDARY_MIRROR_FALLBACK`, which searches the local fallback catalog. The QA audit verified this recovery path.
+- Recovery actions and workflow failures are recorded in structured logs and surfaced through incident tracking. Unrecovered failures remain failures; they are not reported as successful recoveries.
+- When a successful search is available, the system filters and ranks options. The dashboard can then simulate a seat selection and booking confirmation.
 
-## 10. Incident Detection
-The system detects four classes of runtime incidents:
-1. **Transient Service Outages:** Unresponsive or timed-out upstream endpoints (`TransientServiceError`).
-2. **Catalog Corruption:** Damaged or absent mock data catalogs (`DataFetchError`).
-3. **Over-Constrained Zero-Result Outages:** Restrictive user criteria yielding zero candidate buses.
-4. **Report Storage IO Locks:** Permission or filesystem failures during artifact creation (`ReportGenerationError`).
+The fallback catalog, booking confirmation, and PNR are all local simulation data; they do not represent a real reservation.
 
----
+### Simulated route coverage
 
-## 11. Retry Mechanism (Exponential Backoff)
-Implemented in `redbus_automation/retry_engine.py`:
-- **Bounded Attempts:** Configured to a maximum of 3 retries.
-- **Exponential Formula:**
-  $$\text{Delay} = \text{Initial Delay (0.05s)} \times (2.0)^{\text{attempt}-1}$$
-- **Safety Gate:** Rejects permanent errors (`ValidationError`, `TypeError`, `ValueError`) on attempt 0 without entering the retry loop.
+The local catalogs currently cover these 10 inter-state city pairs in both directions: Bangalore–Chennai, Bangalore–Hyderabad, Delhi–Jaipur, Mumbai–Ahmedabad, Mumbai–Panaji, Kolkata–Bhubaneswar, Lucknow–Patna, Chandigarh–Shimla, Kochi–Coimbatore, and Indore–Jaipur. The existing Pune–Mumbai route remains available as a legacy same-state demo route. Each supported direction has matching primary and secondary mirror data. Other routes are unsupported and return no catalog candidates. All schedules and fares are illustrative demo data, not live RedBus availability.
 
----
+## Technologies used
 
-## 12. Recovery Mechanism (Self-Healing)
-Implemented in `redbus_automation/recovery_engine.py`:
-- **`SECONDARY_MIRROR_FALLBACK`:** Activates an offline mirror catalog when primary search fails.
-- **`CATALOG_SEED_RECONSTITUTION`:** Rebuilds verified master seed schedules if the local data file is deleted or corrupt.
-- **`CONSTRAINT_RELAXATION`:** Relaxes the maximum budget by 25% and drops strict operator filters when user filters yield zero buses.
-- **`UnrecoverableIncidentError`:** Escalates critical failure telemetry if all self-healing options fail.
+- **Python** for the workflow engine and CLI.
+- **Streamlit** for the dashboard and interactive simulation.
+- **Pandas** for dashboard data handling.
+- **Pytest** for automated tests.
+- **Python standard library** modules, including JSON and CSV support, for local data, logs, and reports.
+- **Bash** scripts for environment setup, application startup, health checks, and test execution; the repository also contains a GitHub Actions workflow.
 
----
+`requirements.txt` directly lists Streamlit and pytest.
 
-## 13. Structured JSON Logging
-Every system event is written to `logs/automation_execution.jsonl` using a standardized JSON schema:
-- `timestamp`: ISO-8601 string
-- `execution_id`: Unique workflow run ID
-- `event_type`: Domain event enum (e.g. `WORKFLOW_STARTED`, `RETRY_TRIGGERED`, `RECOVERY_COMPLETED`)
-- `severity`: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
-- `component`: Originating module name
-- `message`: Diagnostic log message
-- `execution_status`: Current lifecycle status
-- `metadata`: Contextual key-value payload
+## Installation
 
----
+### Windows with Git Bash
 
-## 14. Operational Reporting
-Every run produces two compliance artifacts in `reports/`:
-- **CSV Report (`report_<EXEC_ID>.csv`):** Tabular format with execution ID, route, duration, status, retries, recoveries, and full bus comparison attributes.
-- **JSON Report (`report_<EXEC_ID>.json`):** Hierarchical structured payload with complete request parameters, retry details, recovery actions, and ranked results.
+Install Python and Git for Windows, clone the repository, and open Git Bash in its root directory:
 
----
-
-## 15. Bash Scripting & DevOps
-All shell scripts under `scripts/` are compatible with both **Windows 11 Git Bash** and **Linux Bash**:
-- **`scripts/setup.sh`:** Verifies Python, creates `.venv`, activates it, and installs `requirements.txt`.
-- **`scripts/start_app.sh`:** Verifies dependencies and launches Streamlit dashboard headless.
-- **`scripts/run_tests.sh`:** Runs Pytest test suite with verbose output and propagates exit codes.
-- **`scripts/health_check.sh`:** Verifies directories, catalog data, packages, and write permissions.
-
----
-
-## 16. Installation Instructions for Windows 11
-
-### Prerequisites
-- Windows 11 (64-bit)
-- Python 3.9+ installed and added to PATH (`python --version`)
-- Git for Windows (`git --version`)
-
-### Quick Setup Steps
-1. Clone or navigate to the repository:
-   ```cmd
-   git clone https://github.com/KuruvaAshok09/redbus-intelligent-automation.git
-   cd redbus-intelligent-automation
-   ```
-2. Create and activate a virtual environment:
-   ```cmd
-   python -m venv .venv
-   .venv\Scripts\activate
-   ```
-3. Install dependencies:
-   ```cmd
-   python -m pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-4. Verify installation:
-   ```cmd
-   python -m pytest tests/ -v
-   ```
-
----
-
-## 17. Git Bash Setup Instructions
-In Git Bash on Windows:
 ```bash
-# 1. Run the automated setup script
+git clone https://github.com/KuruvaAshok09/redbus-intelligent-automation.git
+cd redbus-intelligent-automation
 bash scripts/setup.sh
-
-# 2. Audit system health
 bash scripts/health_check.sh
-
-# 3. Execute the full test suite
-bash scripts/run_tests.sh
 ```
 
----
+The setup script creates or uses the project `.venv` and installs the dependencies from `requirements.txt`.
 
-## 18. Dashboard Execution (Streamlit)
-To launch the interactive Web Dashboard:
-```bash
-# Using Python directly
-python -m streamlit run app.py
+From PowerShell, if Git Bash is installed at its default location, the setup command is:
 
-# Or via Bash script
-bash scripts/start_app.sh
+```powershell
+& 'C:\Program Files\Git\bin\bash.exe' -lc './scripts/setup.sh'
 ```
-Open your web browser at: `http://localhost:8501`
 
----
+### Unix-like systems
 
-## 19. CLI Execution
-Execute intelligent searches directly from the command line:
+From the repository root:
 
 ```bash
-# Standard search on default corridor (Bangalore -> Hyderabad)
-python -m redbus_automation.main
-
-# Custom search with parameters
-python -m redbus_automation.main --source Bangalore --destination Hyderabad --date 2026-11-20 --budget 1500 --passengers 2
-
-# Demonstrate fault injection and self-healing resilience
-python -m redbus_automation.main --source Bangalore --destination Hyderabad --simulate-transient-failure
+bash scripts/setup.sh
+bash scripts/health_check.sh
 ```
 
----
+## Start the application
 
-## 20. Test Execution (Pytest)
-Run the automated test suite:
+From Git Bash or a Unix-like shell in the repository root:
+
 ```bash
-# Execute all tests with short traceback
-python -m pytest tests/ -v --tb=short
-
-# Run a specific test module
-python -m pytest tests/test_retry.py -v
+bash scripts/start.sh
 ```
-**Test Results:** **67 passed in 1.08 seconds** (100% pass rate).
 
----
+Then open [http://localhost:8501](http://localhost:8501). The startup script uses port 8501 by default and supports overriding it with `STREAMLIT_PORT`.
 
-## 21. Sample Input and Output
+To select port 8502 from Git Bash:
 
-### CLI Command
 ```bash
-python -m redbus_automation.main --source Bangalore --destination Hyderabad --budget 2000
+STREAMLIT_PORT=8502 bash scripts/start.sh
 ```
 
-### CLI Terminal Output
-```
-================================================================================
- REDBUS INTELLIGENT TICKET SEARCH & AUTOMATION SYSTEM
- [OFFLINE-FIRST AUTONOMICS DEMONSTRATION - SIMULATED DATA: Offline demonstration only.]
-================================================================================
+From PowerShell with Git Bash at its default installation path:
 
---- WORKFLOW EXECUTION SUMMARY ---
-Execution ID     : EXEC-20261113-194947-5A04EC
-Status           : SUCCESS
-Execution Time   : 0.033 seconds
-Buses Evaluated  : 10 found, 9 ranked
-Retry Attempts   : 0
-Recovery Actions : 0
-
-================================================================================
- ★ TOP RECOMMENDED BUS: GreenLine Travels (BUS-BLR-HYD-108)
-   Fare        : ₹900.00
-   Departure   : 06:00 -> Arrival: 15:30 (9h 30m)
-   Type        : AC Seater Pushback (2+2)
-   Rating      : 4.2 / 5.0 ★
-   Available   : 22 seats
-   Score       : 0.9067
-   Reason      : Top Recommendation: Best overall composite value (0.91) with shortest transit duration, high seat availability (22 seats).
-================================================================================
-
---- ALL RANKED OPTIONS ---
-Rank  Bus ID               Operator                 Fare      Dep-Arr        Rating   Seats  Score 
-------------------------------------------------------------------------------------------------
-1     BUS-BLR-HYD-108      GreenLine Travels        ₹900.0    06:00-15:30    4.2      22     0.907 
-2     BUS-BLR-HYD-105      SRS Travels              ₹850.0    21:30-07:00    4.0      15     0.900 
-3     BUS-BLR-HYD-103      KSRTC (Airavat Club Cl   ₹980.0    20:30-06:00    4.7      24     0.896 
-4     BUS-BLR-HYD-101      IntrCity SmartBus        ₹1150.0   21:00-06:30    4.8      18     0.790 
-5     BUS-BLR-HYD-110      Go Tour Travels          ₹1100.0   22:00-07:30    4.5      14     0.788 
+```powershell
+$env:STREAMLIT_PORT = '8502'
+& 'C:\Program Files\Git\bin\bash.exe' -lc './scripts/start.sh'
 ```
 
----
+The repository also retains `scripts/start_app.sh` as a compatibility wrapper. `scripts/start.sh` is the canonical startup script.
 
-## 22. Sample JSON Log
-From `logs/automation_execution.jsonl`:
-```json
-{
-  "timestamp": "2026-11-13T19:49:56.812345",
-  "execution_id": "EXEC-20261113-194956-808BD3",
-  "event_type": "RECOVERY_COMPLETED",
-  "severity": "INFO",
-  "component": "RecoveryEngine",
-  "message": "Self-healing strategy 'SECONDARY_MIRROR_FALLBACK' executed successfully: Recovered from transient error using secondary offline mirror. Retrieved 10 available buses.",
-  "execution_status": "RUNNING",
-  "metadata": {
-    "action_id": "REC-C97C1AEB",
-    "strategy": "SECONDARY_MIRROR_FALLBACK"
-  }
-}
+## Run tests
+
+From the project environment:
+
+```bash
+python -m pytest -q
 ```
 
----
+Or use the repository test script from Git Bash or a Unix-like shell:
 
-## 23. Sample CSV Report
-From `reports/report_EXEC-20261113-194947-5A04EC.csv`:
-```csv
-execution_id,status,start_time,end_time,duration_sec,source,destination,journey_date,passengers,max_budget,retries_count,recovery_count,rank,bus_id,operator_name,departure_time,arrival_time,duration,fare,rating,available_seats,composite_score,recommendation_reason,error_message
-EXEC-20261113-194947-5A04EC,SUCCESS,2026-11-13T19:49:47.100,2026-11-13T19:49:47.133,0.033,Bangalore,Hyderabad,2026-11-14,1,2500.0,0,0,1,BUS-BLR-HYD-108,GreenLine Travels,06:00,15:30,9h 30m,900.0,4.2,22,0.9067,Top Recommendation: Best overall composite value (0.91) with shortest transit duration, high seat availability (22 seats).,
+```bash
+bash scripts/test.sh
 ```
 
----
+**Verified result:** `128 passed` (`.\.venv\Scripts\python.exe -m pytest -q`), with no warnings in the latest run. See [FINAL_QA_AUDIT.md](./FINAL_QA_AUDIT.md).
 
-## 24. Project Limitations
-- **Simulated Offline Data:** Real live RedBus pricing and seat availability fluctuate dynamically in real time; this system intentionally operates on simulated offline data to comply with ethical automation guidelines and avoid web scraping restrictions.
-- **Booking & Payments Out of Scope:** By design, real payment gateways, credit card processing, and ticket generation are excluded.
-- **Single Host Concurrency:** Monitoring counters use thread locks for process safety; multi-node distributed deployments would require Redis or Kafka for centralized metric aggregation.
+The final browser regression on a fresh Streamlit process on port 8503 verified that the sidebar options include cities from the local catalogs, including Ahmedabad, Kochi, and Coimbatore, and exclude the selected origin from the destination list. Ahmedabad ↔ Mumbai and Kochi ↔ Coimbatore returned simulated results in both directions; a Kochi → Coimbatore booking produced simulated PNR `SIM-PNR-EB83CA`. Unsupported Bangalore → Jaipur displayed the explicit no-simulated-buses message. Scenario 2 displayed all three retries in both the Workflow and Incident Center, with `SECONDARY_MIRROR_FALLBACK` and a resolved incident.
 
----
+The compatibility wrapper `scripts/run_tests.sh` is also present; `scripts/test.sh` is the canonical test script.
 
-## 25. Future Enhancements
-- **Dynamic Pricing Prediction Engine:** Train a lightweight regression model to forecast seasonal fare fluctuations.
-- **Multi-Modal Route Stitching:** Extend the search engine to combine connecting bus and train segments for tier-2 cities.
-- **Distributed Telemetry Exporter:** Add OpenTelemetry / Prometheus metrics export endpoints for integration with Grafana.
-- **Asynchronous Task Workers:** Implement Celery or RQ workers for running scheduled batch ticket monitoring jobs.
+## Demo
 
----
+1. Start the dashboard and open `http://localhost:8501`.
+2. Set the route, journey date, passenger count, and any available search filters in the sidebar.
+3. Select **Search & Orchestrate Workflow** to execute a search and inspect results, workflow stages, dashboard metrics, incidents, and reports in the tabs.
+4. In **Bus Search & Booking Simulation**, select an available simulated seat, enter the requested demo passenger details, and issue a simulated confirmation. No ticket or payment is created.
+5. To demonstrate recovery from the CLI, run:
 
-## 26. Individual Student Contribution Section
-- **Student Name:** Kuruva Ashok
-- **Degree / Department:** B.Tech Computer Science and Engineering
-- **Institution:** Vel Tech Rangarajan Dr. Sagunthala R&D Institute of Science and Technology
-- **Email:** vtu24734@veltech.edu.in
-- **GitHub Profile:** [@KuruvaAshok09](https://github.com/KuruvaAshok09)
-- **Role Evaluation:** HCLTech Autonomics Role Evaluation
-- **Statement of Authorship:**  
-  *This project was independently architected, implemented, tested, and documented by me. All core modules—including input validation, multi-criteria decision analysis ranking, bounded exponential retry engines, self-healing recovery strategies, structured JSON telemetry, Streamlit dashboard, Bash operational scripts, and CI/CD automation—were developed as an original individual engineering project.*
+   ```bash
+   python -m redbus_automation.main --source Bangalore --destination Hyderabad --simulate-transient-failure
+   ```
+
+   The verified failure/recovery workflow completed with a `RECOVERED` outcome using `SECONDARY_MIRROR_FALLBACK`. The CLI also supports `--simulate-corruption` and `--force-empty` for exercising other simulated failure conditions.
+
+6. To demonstrate the same transient-failure recovery in the dashboard, enable the transient-failure fault injection control in the sidebar before running the workflow.
+
+## Limitations
+
+- The application uses offline simulated catalogs; it has no live RedBus API integration and does not scrape the RedBus website.
+- Bookings, seat availability, confirmations, and PNR references are simulated. There is no live seat reservation, ticket issuance, or payment processing.
+- The project is an offline demonstration; the test and browser verification do not establish live RedBus availability or real booking, payment, or seat reservation.
+- Browser verification covered the routes and controls listed in [FINAL_QA_AUDIT.md](./FINAL_QA_AUDIT.md); it was not an exhaustive manual test of every UI control.
+
+For detailed design notes and a guided walkthrough, see [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), [docs/AUTONOMICS_CONCEPTS.md](./docs/AUTONOMICS_CONCEPTS.md), and [docs/DEMO_GUIDE.md](./docs/DEMO_GUIDE.md).
+
+## Project contribution
+
+Developed by Kuruva Ashok as an individual B.Tech Computer Science and Engineering project for HCLTech Autonomics role evaluation. See [@KuruvaAshok09](https://github.com/KuruvaAshok09).

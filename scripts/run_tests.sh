@@ -10,24 +10,29 @@ echo "=================================================================="
 echo " Executing Automated Test Suite with Pytest"
 echo "=================================================================="
 
-# 1. Activate Virtual Environment if available
-if [ -f ".venv/Scripts/activate" ]; then
-    # shellcheck disable=SC1091
-    source ".venv/Scripts/activate"
-elif [ -f ".venv/bin/activate" ]; then
-    # shellcheck disable=SC1091
-    source ".venv/bin/activate"
+# 1. Prefer the project virtual environment directly to avoid PATH alias issues.
+if [ -f ".venv/Scripts/python.exe" ]; then
+    PYTHON_BIN=".venv/Scripts/python.exe"
+elif [ -f ".venv/bin/python" ]; then
+    PYTHON_BIN=".venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="python3"
+elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN="python"
+else
+    echo "ERROR: Python is not installed. Please run 'bash scripts/setup.sh'." >&2
+    exit 1
 fi
 
 # 2. Check Pytest Availability
-if ! command -v pytest >/dev/null 2>&1 && ! python -m pytest --version >/dev/null 2>&1; then
+if ! "$PYTHON_BIN" -m pytest --version >/dev/null 2>&1; then
     echo "ERROR: pytest is not installed. Please run 'bash scripts/setup.sh'." >&2
     exit 1
 fi
 
 # 3. Execute Pytest with Verbose Output and Return Actual Exit Code
 echo "[*] Running tests under tests/ directory..."
-python -m pytest tests/ -v --tb=short "$@"
+"$PYTHON_BIN" -m pytest tests/ -v --tb=short "$@"
 TEST_EXIT_CODE=$?
 
 if [ $TEST_EXIT_CODE -eq 0 ]; then

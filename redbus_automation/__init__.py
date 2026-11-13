@@ -15,6 +15,11 @@ from redbus_automation.models import (
     DataFetchError,
     ReportGenerationError,
     UnrecoverableIncidentError,
+    Incident,
+    FailureCategory,
+    Seat,
+    BookingRequest,
+    BookingConfirmation,
 )
 from redbus_automation.validator import InputValidator
 from redbus_automation.search_engine import BusSearchEngine
@@ -26,8 +31,10 @@ from redbus_automation.monitoring import MONITOR, AutomationMonitor
 from redbus_automation.logger import LOGGER, AutomationLogger
 from redbus_automation.reporting import REPORTER, ReportGenerator
 from redbus_automation.orchestrator import AutomationOrchestrator
+from redbus_automation.incident_manager import INCIDENT_MANAGER, IncidentManager
+from redbus_automation.booking_engine import BOOKING_ENGINE, BookingEngine
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
     "CONFIG",
@@ -41,6 +48,11 @@ __all__ = [
     "DataFetchError",
     "ReportGenerationError",
     "UnrecoverableIncidentError",
+    "Incident",
+    "FailureCategory",
+    "Seat",
+    "BookingRequest",
+    "BookingConfirmation",
     "InputValidator",
     "BusSearchEngine",
     "BusFilterEngine",
@@ -54,4 +66,8 @@ __all__ = [
     "REPORTER",
     "ReportGenerator",
     "AutomationOrchestrator",
+    "INCIDENT_MANAGER",
+    "IncidentManager",
+    "BOOKING_ENGINE",
+    "BookingEngine",
 ]

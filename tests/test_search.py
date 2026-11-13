@@ -44,6 +44,40 @@ def test_search_returns_matches_for_known_route(search_engine, sample_request):
         assert b.rating >= 0
 
 
+@pytest.mark.parametrize(
+    ("source", "destination"),
+    [
+        ("Bangalore", "Chennai"),
+        ("Chennai", "Bangalore"),
+    ],
+)
+def test_search_returns_simulated_buses_for_chennai_route_directions(
+    search_engine, source, destination
+):
+    request = SearchRequest(
+        source=source,
+        destination=destination,
+        journey_date="2026-11-16",
+        passengers=1,
+        max_budget=2500.0,
+        min_rating=3.0,
+    )
+
+    buses = search_engine.search(request)
+
+    assert buses
+    assert all(
+        bus.source == source
+        and bus.destination == destination
+        and bus.available_seats >= request.passengers
+        and bus.fare <= request.max_budget
+        and bus.rating >= request.min_rating
+        for bus in buses
+    )
+    if source == "Bangalore":
+        assert all(bus.bus_id.startswith("DEMO-BLR-CHN-") for bus in buses)
+
+
 def test_search_is_case_insensitive(search_engine):
     """Verifies search handles lowercase and uppercase input variations."""
     req_lower = SearchRequest(source="bangalore", destination="hyderabad", journey_date="2026-11-20")

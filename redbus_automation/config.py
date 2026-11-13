@@ -20,7 +20,10 @@ class AppConfig:
 
     # Default file paths
     DEFAULT_DATA_FILE: Path = DATA_DIR / "sample_buses.json"
+    DEFAULT_FALLBACK_DATA_FILE: Path = DATA_DIR / "fallback_buses.json"
     LOG_FILE_PATH: Path = LOGS_DIR / "automation_execution.jsonl"
+    INCIDENTS_FILE_PATH: Path = LOGS_DIR / "incidents.jsonl"
+    BOOKINGS_FILE_PATH: Path = REPORTS_DIR / "simulated_bookings.jsonl"
 
     # Autonomics & Retry policies
     DEFAULT_MAX_RETRIES: int = 3
@@ -37,7 +40,7 @@ class AppConfig:
 
     # Simulation Notice
     SIMULATION_DISCLAIMER: str = (
-        "SIMULATED DATA: Offline demonstration only. "
+        "SIMULATED DATA - DEMO / SIMULATION MODE: Offline demonstration only. "
         "No real booking, payment, or external RedBus APIs are contacted."
     )
 
