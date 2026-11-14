@@ -11,15 +11,21 @@ Implements:
 """
 
 import json
+import inspect
 from datetime import datetime, timedelta, date
 from pathlib import Path
-from typing import Optional, List
+from typing import Any, Dict, List, Optional
 
 import streamlit as st
 import pandas as pd
 
 from redbus_automation.config import CONFIG
-from redbus_automation.models import SearchRequest, WorkflowStatus, FailureCategory
+from redbus_automation.models import (
+    AutomationEventType,
+    SearchRequest,
+    WorkflowExecutionResult,
+    WorkflowStatus,
+)
 from redbus_automation.orchestrator import AutomationOrchestrator
 from redbus_automation.monitoring import MONITOR
 from redbus_automation.logger import LOGGER
@@ -27,6 +33,191 @@ from redbus_automation.incident_manager import INCIDENT_MANAGER
 from redbus_automation.booking_engine import BOOKING_ENGINE
 from redbus_automation.html_utils import escape_html
 from redbus_automation.search_engine import BusSearchEngine
+
+
+def _card_container():
+    if "border" in inspect.signature(st.container).parameters:
+        return st.container(border=True)
+    return st.container()
+
+
+def _build_workflow_stages(
+    result: Optional[WorkflowExecutionResult],
+    events: Optional[List[Dict[str, Any]]] = None,
+) -> List[dict[str, str]]:
+    stage_definitions = [
+        ("Request Initialization", "Workflow execution was created and started."),
+        ("Input Validation", "Request fields and business constraints were checked."),
+        ("Bus Search", "Primary catalog search and any recorded recovery were evaluated."),
+        ("Availability Evaluation", "Search results were evaluated against request constraints."),
+        ("MCDA Recommendation", "Eligible results were ranked for recommendation."),
+        ("Audit Report Generation", "Execution audit reports were generated."),
+        ("Booking Simulation", "A simulated booking was recorded for this execution."),
+        ("Execution Outcome", "The orchestrator returned its final execution result."),
+        ("Audit Logging", "A terminal workflow event was recorded for this execution."),
+    ]
+    stages = [
+        {"name": name, "description": description, "status": "Pending"}
+        for name, description in stage_definitions
+    ]
+
+    if result is None:
+        return stages
+
+    events = events if events is not None else LOGGER.get_logs(result.execution_id)
+    event_types = {entry.get("event_type") for entry in events}
+    stage_position = {
+        "WORKFLOW_INITIATION": 0,
+        "INPUT_VALIDATION": 1,
+        "CATALOG_SEARCH": 2,
+        "AUTONOMIC_RECOVERY": 3,
+        "FILTERING": 4,
+        "FILTER_RELAXATION_RECOVERY": 5,
+        "RANKING": 6,
+        "REPORTING": 7,
+        "COMPLETED": 8,
+    }.get(result.stage_reached, 0)
+    validation_passed = (
+        AutomationEventType.VALIDATION_PASSED.value in event_types
+        or stage_position > 1
+    )
+    validation_failed = (
+        AutomationEventType.VALIDATION_FAILED.value in event_types
+        or (
+            result.stage_reached == "INPUT_VALIDATION"
+            and result.status == WorkflowStatus.FAILED
+        )
+    )
+    search_completed = (
+        AutomationEventType.SEARCH_COMPLETED.value in event_types
+        or stage_position > 3
+    )
+    search_failed = (
+        result.status == WorkflowStatus.FAILED
+        and result.stage_reached in ("CATALOG_SEARCH", "AUTONOMIC_RECOVERY")
+    )
+    availability_completed = (
+        AutomationEventType.FILTER_APPLIED.value in event_types
+        or stage_position > 5
+    )
+    availability_failed = (
+        result.status == WorkflowStatus.FAILED
+        and result.stage_reached in ("FILTERING", "FILTER_RELAXATION_RECOVERY")
+        and not availability_completed
+    )
+    ranking_completed = (
+        AutomationEventType.RANKING_COMPLETED.value in event_types
+        or stage_position > 6
+    )
+    ranking_failed = (
+        result.status == WorkflowStatus.FAILED
+        and result.stage_reached == "RANKING"
+        and not ranking_completed
+    )
+    report_generated = (
+        AutomationEventType.REPORT_GENERATED.value in event_types
+        or bool(result.report_paths)
+        or stage_position > 7
+    )
+    report_failed = (
+        result.status == WorkflowStatus.FAILED
+        and result.stage_reached == "REPORTING"
+        and not report_generated
+    )
+
+    initialization_failed = (
+        result.status == WorkflowStatus.FAILED
+        and result.stage_reached == "WORKFLOW_INITIATION"
+    )
+    stages[0]["status"] = (
+        "Failed"
+        if initialization_failed
+        else "Completed"
+        if AutomationEventType.WORKFLOW_STARTED.value in event_types or result.start_time
+        else "Pending"
+    )
+    stages[1]["status"] = (
+        "Completed"
+        if validation_passed
+        else "Failed"
+        if validation_failed
+        else "Skipped"
+    )
+    stages[2]["status"] = (
+        "Completed"
+        if search_completed
+        else "Failed"
+        if search_failed
+        else "Skipped"
+    )
+    stages[3]["status"] = (
+        "Completed"
+        if availability_completed
+        else "Failed"
+        if availability_failed
+        else "Skipped"
+    )
+    stages[4]["status"] = (
+        "Completed"
+        if ranking_completed
+        else "Failed"
+        if ranking_failed
+        else "Skipped"
+    )
+    stages[5]["status"] = (
+        "Completed"
+        if report_generated
+        else "Failed"
+        if report_failed
+        else "Skipped"
+    )
+    stages[6]["status"] = (
+        "Completed"
+        if AutomationEventType.BOOKING_SIMULATED.value in event_types
+        else "Skipped"
+    )
+    stages[7]["status"] = "Completed"
+    terminal_events = {
+        AutomationEventType.WORKFLOW_COMPLETED.value,
+        AutomationEventType.WORKFLOW_TERMINATED.value,
+        AutomationEventType.VALIDATION_FAILED.value,
+    }
+    stages[8]["status"] = (
+        "Completed" if terminal_events.intersection(event_types) else "Pending"
+    )
+
+    if search_completed and result.recovery_history:
+        stages[2]["description"] = (
+            "Search completed with recorded recovery: "
+            + ", ".join(action.strategy_used for action in result.recovery_history)
+            + "."
+        )
+    if ranking_completed and result.recommended_bus is None:
+        stages[4]["description"] = (
+            "Ranking completed; no eligible recommendation was returned."
+        )
+    if report_generated and result.status == WorkflowStatus.FAILED:
+        stages[5]["description"] = (
+            "Failure audit reports were generated for this unsuccessful execution."
+        )
+    if report_failed:
+        stages[5]["description"] = (
+            "The workflow failed during report generation; no report artifact was returned."
+        )
+    if stages[6]["status"] == "Skipped":
+        stages[6]["description"] = (
+            "No booking record is linked to this execution; booking is a separate action."
+        )
+    stages[7]["description"] = (
+        f"Final result: {result.status.value} at {result.stage_reached}."
+    )
+    if stages[8]["status"] == "Pending":
+        stages[8]["description"] = (
+            "No terminal workflow event is available to confirm this stage."
+        )
+
+    return stages
+
 
 # -----------------------------------------------------------------------------
 # 1. Page Configuration & Meta
@@ -231,108 +422,6 @@ st.markdown(
         margin-top: 6px;
     }
 
-    /* Hero Recommendation Card */
-    .hero-recommendation-card {
-        background: linear-gradient(145deg, #111827 0%, #0D1424 100%);
-        border: 1px solid rgba(59, 130, 246, 0.35);
-        border-radius: 14px;
-        padding: 24px;
-        margin-top: 12px;
-        margin-bottom: 24px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-    }
-
-    .hero-top-badge {
-        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
-        color: #FFFFFF;
-        font-size: 0.72rem;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        padding: 4px 10px;
-        border-radius: 20px;
-        display: inline-block;
-        margin-bottom: 12px;
-    }
-
-    .hero-operator-title {
-        font-size: 1.6rem;
-        font-weight: 700;
-        color: #FFFFFF;
-        letter-spacing: -0.02em;
-        margin-bottom: 4px;
-    }
-
-    .hero-bus-spec {
-        font-size: 0.85rem;
-        color: var(--text-secondary);
-        margin-bottom: 16px;
-    }
-
-    .timeline-container {
-        background: rgba(15, 23, 42, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 10px;
-        padding: 14px 20px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 18px;
-    }
-
-    .timeline-time {
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: #FFFFFF;
-        font-family: 'JetBrains Mono', monospace;
-    }
-
-    .timeline-city {
-        font-size: 0.8rem;
-        color: var(--text-secondary);
-    }
-
-    .timeline-divider {
-        flex-grow: 1;
-        margin: 0 20px;
-        text-align: center;
-        position: relative;
-    }
-
-    .timeline-duration-badge {
-        background: #1E293B;
-        color: #93C5FD;
-        border: 1px solid rgba(59, 130, 246, 0.3);
-        border-radius: 12px;
-        padding: 3px 12px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        display: inline-block;
-    }
-
-    .explainability-box {
-        background: rgba(99, 102, 241, 0.08);
-        border-left: 3px solid #6366F1;
-        border-radius: 0 8px 8px 0;
-        padding: 12px 16px;
-        margin-top: 14px;
-    }
-
-    .explainability-title {
-        font-size: 0.75rem;
-        font-weight: 700;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        color: #A5B4FC;
-        margin-bottom: 4px;
-    }
-
-    .explainability-body {
-        font-size: 0.85rem;
-        color: #E2E8F0;
-        line-height: 1.45;
-    }
-
     /* Tabs Styling */
     div[data-baseweb="tab-list"] {
         gap: 6px;
@@ -387,27 +476,6 @@ st.markdown(
         background: rgba(239, 68, 68, 0.1);
         border: 1px solid rgba(239, 68, 68, 0.3);
         color: #F87171;
-    }
-
-    /* Pipeline Stage Node */
-    .pipeline-stage {
-        background: #111827;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 8px;
-        padding: 10px 14px;
-        text-align: center;
-        flex: 1;
-        margin: 0 4px;
-    }
-
-    .pipeline-active {
-        border-color: #3B82F6;
-        background: rgba(59, 130, 246, 0.1);
-    }
-
-    .pipeline-success {
-        border-color: #10B981;
-        background: rgba(16, 185, 129, 0.08);
     }
 
     /* Seat Layout Grid */
@@ -741,66 +809,41 @@ with tab_exec:
         )
 
         if result.recommended_bus:
-            top = result.recommended_bus
-            st.markdown(
-                f"""
-                <div class="hero-recommendation-card">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div>
-                            <div class="hero-top-badge">🏆 TOP RECOMMENDED BUS (MCDA RANK #1)</div>
-                            <div class="hero-operator-title">{escape_html(top.bus.operator_name)}</div>
-                            <div class="hero-bus-spec">Bus ID: <code>{escape_html(top.bus.bus_id)}</code> &nbsp;•&nbsp; Category: {escape_html(top.bus.bus_type)}</div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="font-size: 0.75rem; color: #94A3B8; text-transform: uppercase; font-weight: 600;">Optimal Fare</div>
-                            <div style="font-size: 2.1rem; font-weight: 800; color: #FFFFFF; font-family: 'JetBrains Mono', monospace;">
-                                ₹{top.bus.fare:.2f}
-                            </div>
-                            <div style="font-size: 0.75rem; color: #10B981; font-weight: 600;">Composite MCDA Score: {top.composite_score:.4f}</div>
-                        </div>
-                    </div>
-
-                    <div class="timeline-container">
-                        <div>
-                            <div class="timeline-time">{escape_html(top.bus.departure_time)}</div>
-                            <div class="timeline-city">{escape_html(result.request.source)}</div>
-                        </div>
-                        <div class="timeline-divider">
-                            <div class="timeline-duration-badge">⏱️ {escape_html(top.bus.duration_formatted)}</div>
-                            <div style="border-top: 1px dashed rgba(255,255,255,0.2); margin-top: -10px;"></div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div class="timeline-time">{escape_html(top.bus.arrival_time)}</div>
-                            <div class="timeline-city">{escape_html(result.request.destination)}</div>
-                        </div>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 8px;">
-                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px; text-align: center;">
-                            <div style="font-size: 0.7rem; color: #94A3B8; text-transform: uppercase;">Rating</div>
-                            <div style="font-size: 1.1rem; font-weight: 700; color: #FBBF24;">★ {top.bus.rating} / 5.0</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px; text-align: center;">
-                            <div style="font-size: 0.7rem; color: #94A3B8; text-transform: uppercase;">Available Seats</div>
-                            <div style="font-size: 1.1rem; font-weight: 700; color: #34D399;">{top.bus.available_seats} Seats</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px; text-align: center;">
-                            <div style="font-size: 0.7rem; color: #94A3B8; text-transform: uppercase;">Retries Triggered</div>
-                            <div style="font-size: 1.1rem; font-weight: 700; color: #60A5FA;">{len(result.retry_history)}</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px; text-align: center;">
-                            <div style="font-size: 0.7rem; color: #94A3B8; text-transform: uppercase;">Self-Healing Actions</div>
-                            <div style="font-size: 1.1rem; font-weight: 700; color: #C084FC;">{len(result.recovery_history)}</div>
-                        </div>
-                    </div>
-
-                    <div class="explainability-box">
-                        <div class="explainability-title">💡 Autonomics Decision Explainability Engine</div>
-                        <div class="explainability-body">{escape_html(top.recommendation_reason)}</div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
+            recommendation = result.recommended_bus
+            with _card_container():
+                st.markdown("#### Top-ranked simulated bus")
+                st.caption(
+                    "Recommendation from the current offline search and MCDA ranking."
+                )
+                st.markdown(
+                    f"**{recommendation.bus.operator_name}** · "
+                    f"`{recommendation.bus.bus_id}` · {recommendation.bus.bus_type}"
+                )
+                recommendation_metrics = st.columns(4)
+                recommendation_metrics[0].metric(
+                    "Fare", f"₹{recommendation.bus.fare:.2f}"
+                )
+                recommendation_metrics[1].metric(
+                    "MCDA score", f"{recommendation.composite_score:.4f}"
+                )
+                recommendation_metrics[2].metric(
+                    "Rating", f"{recommendation.bus.rating:.1f} / 5.0"
+                )
+                recommendation_metrics[3].metric(
+                    "Available seats", recommendation.bus.available_seats
+                )
+                st.markdown(
+                    f"**Journey:** {recommendation.bus.departure_time} · "
+                    f"{result.request.source} → {result.request.destination} · "
+                    f"{recommendation.bus.arrival_time} · "
+                    f"{recommendation.bus.duration_formatted}"
+                )
+                st.caption("Decision rationale")
+                st.write(recommendation.recommendation_reason)
+        else:
+            st.info(
+                "No ranked recommendation is available for this execution. "
+                "Review the Bus Search & Booking Simulation section for results."
             )
     else:
         st.info("👈 Configure route parameters in the sidebar and execute an orchestration to view operational insights.")
@@ -810,81 +853,107 @@ with tab_exec:
 # -----------------------------------------------------------------------------
 with tab_workflow:
     st.markdown("### ⚙️ Automation Workflow & Execution Lifecycle")
-    st.markdown(
-        "<div style='font-size: 0.85rem; color: #94A3B8; margin-bottom: 16px;'>"
-        "Deterministic pipeline lifecycle: User Request → Input Validation → Bus Search → Failure Detection → Retry → Fallback Recovery → Result Validation → Final Response → Logging."
-        "</div>",
-        unsafe_allow_html=True,
+    st.caption(
+        "Execution stages and outcomes below are derived from the completed workflow "
+        "result and its execution-scoped audit events."
     )
 
-    # Pipeline Stage Visual Indicator
-    curr_stage = result.stage_reached if result else "IDLE"
-    st_val = "pipeline-success" if result and result.stage_reached != "INPUT_VALIDATION" and result.status != WorkflowStatus.FAILED else ("pipeline-active" if curr_stage == "INPUT_VALIDATION" else "")
-    st_srch = "pipeline-success" if result and result.stage_reached in ("FILTERING", "RANKING", "REPORTING", "COMPLETED") else ("pipeline-active" if curr_stage == "CATALOG_SEARCH" else "")
-    st_rec = "pipeline-success" if result and len(result.recovery_history) > 0 else ""
-    st_rank = "pipeline-success" if result and len(result.ranked_buses) > 0 else ""
-    st_rep = "pipeline-success" if result and bool(result.report_paths) else ""
-
-    st.markdown(
-        f"""
-        <div style="display: flex; justify-content: space-between; margin-bottom: 24px;">
-            <div class="pipeline-stage {st_val}">
-                <div style="font-size: 0.7rem; color: #94A3B8;">STEP 1</div>
-                <div style="font-weight: 700; font-size: 0.85rem;">Input Validation</div>
-            </div>
-            <div class="pipeline-stage {st_srch}">
-                <div style="font-size: 0.7rem; color: #94A3B8;">STEP 2</div>
-                <div style="font-weight: 700; font-size: 0.85rem;">Catalog Search</div>
-            </div>
-            <div class="pipeline-stage {st_rec}">
-                <div style="font-size: 0.7rem; color: #94A3B8;">STEP 3</div>
-                <div style="font-weight: 700; font-size: 0.85rem;">Retry / Recovery</div>
-            </div>
-            <div class="pipeline-stage {st_rank}">
-                <div style="font-size: 0.7rem; color: #94A3B8;">STEP 4</div>
-                <div style="font-weight: 700; font-size: 0.85rem;">MCDA Ranking</div>
-            </div>
-            <div class="pipeline-stage {st_rep}">
-                <div style="font-size: 0.7rem; color: #94A3B8;">STEP 5</div>
-                <div style="font-weight: 700; font-size: 0.85rem;">Audit Reports</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    execution_events = (
+        LOGGER.get_logs(result.execution_id) if result is not None else []
     )
+    workflow_stages = _build_workflow_stages(result, execution_events)
+    if result is not None:
+        completed_stages = sum(
+            stage["status"] == "Completed" for stage in workflow_stages
+        )
+        failed_stages = sum(
+            stage["status"] == "Failed" for stage in workflow_stages
+        )
+        recovery_attempts = sum(
+            event.get("event_type") == AutomationEventType.RECOVERY_INITIATED.value
+            for event in execution_events
+        )
+        st.markdown(f"**Execution ID:** `{result.execution_id}`")
 
-    if result:
-        col_w1, col_w2 = st.columns(2)
-        with col_w1:
+        summary_columns = st.columns(7)
+        summary_columns[0].metric("Overall status", result.status.value)
+        summary_columns[1].metric("Total stages", len(workflow_stages))
+        summary_columns[2].metric("Completed", completed_stages)
+        summary_columns[3].metric("Failed", failed_stages)
+        summary_columns[4].metric("Retries", len(result.retry_history))
+        summary_columns[5].metric("Recovery actions", len(result.recovery_history))
+        summary_columns[6].metric(
+            "Execution time", f"{result.execution_duration_sec:.3f}s"
+        )
+        if recovery_attempts > len(result.recovery_history):
+            st.caption(
+                f"{recovery_attempts} recovery attempt(s) were logged; "
+                f"{len(result.recovery_history)} recovery action(s) returned."
+            )
+    else:
+        st.info("No execution recorded yet. Stages remain pending until a workflow runs.")
+        summary_columns = st.columns(6)
+        summary_columns[0].metric("Overall status", "Pending")
+        summary_columns[1].metric("Total stages", len(workflow_stages))
+        summary_columns[2].metric("Completed", "—")
+        summary_columns[3].metric("Failed", "—")
+        summary_columns[4].metric("Retries", "—")
+        summary_columns[5].metric("Recovery actions", "—")
+
+    st.markdown("#### Execution pipeline")
+    status_icons = {
+        "Pending": "⏳",
+        "Running": "🔄",
+        "Completed": "✅",
+        "Failed": "❌",
+        "Skipped": "⏭️",
+    }
+    for index, stage in enumerate(workflow_stages, start=1):
+        with _card_container():
+            stage_columns = st.columns([0.45, 4.2, 1.35])
+            stage_columns[0].markdown(f"**{index:02d}**")
+            stage_columns[1].markdown(f"**{stage['name']}**")
+            stage_columns[1].caption(stage["description"])
+            stage_columns[2].markdown(
+                f"**{status_icons[stage['status']]} {stage['status']}**"
+            )
+        if index < len(workflow_stages):
+            connector_columns = st.columns([1, 8, 1])
+            connector_columns[1].markdown("↓")
+
+    if result is not None:
+        detail_columns = st.columns(2)
+        with detail_columns[0]:
             st.markdown(f"#### Bounded Retry Telemetry ({len(result.retry_history)} events)")
             if result.retry_history:
-                for r in result.retry_history:
-                    st.warning(f"**Attempt #{r.attempt_number}** | Delay: `{r.delay_seconds:.3f}s` | Target: `{r.target_function}`\n\n*Cause:* {r.error_message}")
-            else:
-                st.success("No retries triggered. Primary catalog search succeeded on initial attempt.")
-
-        with col_w2:
-            st.markdown("#### Self-Healing Remediation Stream")
-            if result.recovery_history:
-                for rec in result.recovery_history:
-                    status_badge = "✅ SUCCESS" if rec.successful else "❌ FAILED"
-                    st.markdown(
-                        f"""
-                        <div style="background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 14px; margin-bottom: 10px;">
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="font-weight: 700; color: #60A5FA;">Strategy: {escape_html(rec.strategy_used)}</span>
-                                <span>{escape_html(status_badge)}</span>
-                            </div>
-                            <div style="font-size: 0.8rem; color: #E2E8F0; margin-top: 4px;">{escape_html(rec.details)}</div>
-                            <div style="font-size: 0.7rem; color: #64748B; margin-top: 4px;">Action ID: <code>{escape_html(rec.action_id)}</code></div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
+                for retry in result.retry_history:
+                    st.warning(
+                        f"**Attempt #{retry.attempt_number}** | "
+                        f"Delay: `{retry.delay_seconds:.3f}s` | "
+                        f"Target: `{retry.target_function}`\n\n"
+                        f"*Cause:* {retry.error_message}"
                     )
             else:
-                st.info("No failure incidents occurred. Standard path executed.")
-    else:
-        st.info("Execute a search to view real-time stage progression.")
+                st.caption("No retry events were recorded for this execution.")
+
+        with detail_columns[1]:
+            st.markdown("#### Self-Healing Remediation Stream")
+            if result.recovery_history:
+                for recovery in result.recovery_history:
+                    with _card_container():
+                        recovery_columns = st.columns([3, 1])
+                        recovery_columns[0].markdown(
+                            f"**Strategy:** {recovery.strategy_used}"
+                        )
+                        recovery_columns[1].markdown(
+                            "**✅ Successful**"
+                            if recovery.successful
+                            else "**❌ Failed**"
+                        )
+                        st.caption(recovery.details)
+                        st.caption(f"Action ID: `{recovery.action_id}`")
+            else:
+                st.caption("No recovery actions were returned for this execution.")
 
 # -----------------------------------------------------------------------------
 # TAB 3: Bus Search & Simulated Booking Workflow
